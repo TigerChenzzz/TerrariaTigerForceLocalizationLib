@@ -8,8 +8,8 @@
 
 ### 添加依赖
 1. 将 TigerForceLocalizationLib.dll 和 TigerForceLocalizationLib.xml (.xml 提供注释, 不是必须, 但建议携带) 放入你的Mod中的 lib 文件夹下 (如果没有就创建一个)
-1. 在 build.txt 中添加一行: ~modReferences = TigerForceLocalizationLib~  (当你的 mod 有多个 modReferences 时可以用 ',' 隔开).
-    或者也可以使用 ~dllReferences = TigerForceLocalizationLib~, 这样则不用模组依赖
+1. 在 build.txt 中添加一行: `modReferences = TigerForceLocalizationLib`  (当你的 mod 有多个 modReferences 时可以用 ',' 隔开).
+    或者也可以使用 `dllReferences = TigerForceLocalizationLib`, 这样则不用模组依赖
 1. 在你的项目中添加对此 dll 的引用<br/>
 	对于 VS, 在资源管理器中右键依赖项 -> 添加项目引用 -> 右下角浏览 -> 找到 lib 文件夹下的 dll 文件 -> 添加<br/>
 	或者也可以直接在 .csproj 文件中添加:
@@ -38,8 +38,8 @@
 一般来说你需要新定义一个类继承自 ForceLocalizeSystem&lt;TSelf>,
 其中 TSelf 填此类本身的名字.
 然后就可以用此类的 Localize 或 LocalizeXxx 静态方法以进行本地化.<br/>
-当为弱引用时此类和用到此类的类或方法需要添加 ~[JITWhenModsEnabled(modName)]~,
-其中 modName 为需要被本地化的模组, 有可能还要添加 ~[ExtendsFromMod(modName)]~.<br/>
+当为弱引用时此类和用到此类的类或方法需要添加 `[JITWhenModsEnabled(modName)]`,
+其中 modName 为需要被本地化的模组, 有可能还要添加 `[ExtendsFromMod(modName)]`.<br/>
 此外, ForceLocalizeSystemImpl&lt;TMod> 和 ForceLocalizeSystemByLocalizeTextImpl&lt;TMod>
 可以直接使用, 其中 ForceLocalizeSystemByLocalizeTextImpl 为使用 Language.GetTextValue 的方式代替字符串,
 在使用它的 Localize 系方法时传入的新字符串应该是 hjson 的键.
