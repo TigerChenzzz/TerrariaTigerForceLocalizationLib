@@ -44,3 +44,6 @@
 可以直接使用, 其中 ForceLocalizeSystemByLocalizeTextImpl 为使用 Language.GetTextValue 的方式代替字符串,
 在使用它的 Localize 系方法时传入的新字符串应该是 hjson 的键.
 更加详细的说明参见代码内的 xml 注释.
+## 链接
+示例: [TerrariaTigerForceLocalizationExample](https://github.com/TigerChenzzz/TerrariaTigerForceLocalizationExample)<br/>
+[Steam 创意工坊](https://steamcommunity.com/sharedfiles/filedetails/?id=3358131784)
