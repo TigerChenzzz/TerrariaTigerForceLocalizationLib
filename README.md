@@ -7,7 +7,7 @@
 ## 如何使用
 
 ### 添加依赖
-1. 将 TigerForceLocalizationLib.dll 和 TigerForceLocalizationLib.xml (.xml 提供注释, 不是必须, 但建议携带) 放入你的Mod中的 lib 文件夹下 (如果没有就创建一个).
+1. 将 TigerForceLocalizationLib.dll 和 TigerForceLocalizationLib.xml (.xml 提供注释, 不是必须, 但建议携带) 放入你的Mod中的 lib 文件夹下 (如果没有就创建一个). (在 [Release](https://github.com/TigerChenzzz/TerrariaTigerForceLocalizationLib/releases) 中获取)
 1. 在 build.txt 中添加一行: `modReferences = TigerForceLocalizationLib`  (当你的 mod 有多个 modReferences 时可以用 ',' 隔开).
     或者也可以使用 `dllReferences = TigerForceLocalizationLib`, 这样则不用模组依赖.
 1. 在你的项目中添加对此 dll 的引用.<br/>
@@ -20,7 +20,7 @@
 	```
     如果你有源码的话也可以直接添加此项目的引用 (此时要注意源码与 dll 需保持一致).
 ### 使用 TigerForceLocalizationHelper.LocalizeAll 直接本地化整个目标模组
-1. 在 Mod 或 ModSystem 中使用 TigerForceLocalizationHelper.LocalizeAll, 并将 registerKey 参数设置为 true.
+1. 在 Mod 或 ModSystem 的 PostSetupContent 中使用 `TigerForceLocalizationHelper.LocalizeAll`, 并将 registerKey 参数设置为 true.
 1. 连同目标模组一起加载一次, 本地化模组的 hjson 文件将会自动更新.
 1. 将 TigerForceLocalizationHelper.LocalizeAll 的 registerKey 参数设置为 false.
 1. 注意不同语言的 hjson 需要同步操作, 尤其是 en-US.
