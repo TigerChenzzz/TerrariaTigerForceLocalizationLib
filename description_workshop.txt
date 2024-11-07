@@ -1,0 +1,7 @@
+[h3][b]!!! 本模组为模组类库, 直接启用不会有任何效果 !!![/b][/h3]
+这是用来辅助本地化硬编码文本的模组.
+不止于汉化, 用来翻译为其他语言或者多语言都是可以的.
+github 见 https://github.com/TigerChenzzz/TerrariaTigerForceLocalizationLib
+示例模组见 https://steamcommunity.com/sharedfiles/filedetails/?id=3358134129
+[quote=tModLoader TigerForceLocalizationLib]
+Developed By Tigerzzz[/quote]

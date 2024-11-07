@@ -276,6 +276,8 @@ public static class TigerForceLocalizationHelper {
     /// <br/>第一次注册键往往是一个漫长的过程
     /// <br/>此方法可以在此过程中显示其进度
     /// </summary>
+    /// <param name="progressTextFormat">进度文字的格式, 显示在进度条上方的大字, 其中 {0} 表示模组名</param>
+    /// <param name="subProgressTextFormat">副进度文字的格式, 显示在进度条下方的小字, 其中 {0} 表示本地化键名</param>
     public static void ShowLocalizationRegisterProgress(string progressTextFormat = "更新本地化文件: {0}", string subProgressTextFormat = "注册键: {0}") {
         if (finishedLocalizeRegister)
             return;
