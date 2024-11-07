@@ -9,6 +9,8 @@ using System.Text;
 using Terraria.Localization;
 using Terraria.ModLoader;
 using Terraria.ModLoader.Core;
+using TigerForceLocalizationLib.Filters;
+using TypeFilter = TigerForceLocalizationLib.Filters.TypeFilter;
 
 namespace TigerForceLocalizationLib;
 
@@ -16,6 +18,24 @@ namespace TigerForceLocalizationLib;
 /// 用以辅助本地化的一些方法
 /// </summary>
 public static class TigerForceLocalizationHelper {
+    /// <summary>
+    /// 筛选需要本地化的内容
+    /// </summary>
+    public class LocalizeFilters {
+        /// <summary>
+        /// 筛选一个类型
+        /// </summary>
+        public TypeFilter? TypeFilter { get; init; }
+        /// <summary>
+        /// 筛选一个方法
+        /// </summary>
+        public MethodFilter? MethodFilter { get; init; }
+        /// <summary>
+        /// 筛选特定字符串处的<see cref="ILCursor"/>
+        /// 此时 <see cref="ILCursor.Next"/> 一般会指向一处 ldstr
+        /// </summary>
+        public ILCursorFilter? CursorFilter { get; init; }
+    }
     /// <summary>
     /// <br/>以 hjson 的方式本地化一个模组中的所有方法
     /// <br/>在 PostSetup 阶段使用
@@ -49,43 +69,42 @@ public static class TigerForceLocalizationHelper {
     /// <br/>否则直接使用字符串替换
     /// <br/>如果设置为 true 可能会稍微影响性能, 但是支持 hjson 热重载和多语言切换
     /// </param>
-    public static void LocalizeAll(string selfModName, string modName, bool registerKey = false, string? localizationRoot = null, bool useLocalizedText = true) {
+    /// <param name="filters">筛选需要本地化的内容</param>
+    public static void LocalizeAll(string selfModName, string modName, bool registerKey = false, string? localizationRoot = null, bool useLocalizedText = true, LocalizeFilters? filters = null) {
         if (!ModLoader.TryGetMod(modName, out var mod)) {
             throw new Exception($"未找到模组\"{modName}\"!");
         }
         localizationRoot ??= $"Mods.{selfModName}.ForceLocalizations";
-        foreach (var type in AssemblyManager.GetLoadableTypes(mod.Code)) {
-            if (type.ContainsGenericParameters) {
-                continue;
-            }
+        #region 处理 filters
+        var typeFilter = filters?.TypeFilter;
+        var types = typeFilter == null ? AssemblyManager.GetLoadableTypes(mod.Code).Where(t => !t.ContainsGenericParameters)
+            : AssemblyManager.GetLoadableTypes(mod.Code).Where(t => !t.ContainsGenericParameters && typeFilter.Filter(t));
+        var methodFilter = filters?.MethodFilter;
+        Func<MethodInfo, bool> GetMethodPredicate(Type type) => methodFilter == null
+            ? method => method.DeclaringType == type
+                    && !method.IsAbstract
+                    && !method.ContainsGenericParameters
+                    && method.GetMethodBody() != null
+            : method => method.DeclaringType == type
+                    && !method.IsAbstract
+                    && !method.ContainsGenericParameters
+                    && method.GetMethodBody() != null
+                    && methodFilter.Filter(method);
+        var cursorFilter = filters?.CursorFilter;
+        #endregion
+        foreach (var type in types) {
             Dictionary<string, int> methodCount = [];
             HashSet<string> usedMethodKey = [];
             var methods = type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-                .Where(method => method.DeclaringType == type && !method.IsAbstract && !method.ContainsGenericParameters && method.GetMethodBody() != null).ToArray();
+                .Where(GetMethodPredicate(type)).ToArray();
             foreach (var method in methods) {
                 if (!methodCount.TryAdd(method.Name, 1)) {
                     methodCount[method.Name] += 1;
                 }
             }
             foreach (var method in methods) {
-                #region 设置 methodKey
-                string methodKey;
-                if (methodCount[method.Name] == 1) {
-                    methodKey = method.Name;
-                }
-                else {
-                    StringBuilder methodKeyBuilder = new();
-                    methodKeyBuilder.Append(method.Name).Append('_').AppendJoin('_', method.GetParameters().Select(p => p.ParameterType.Name));
-                    methodKey = methodKeyBuilder.ToString();
-                }
-                string realMethodKey = methodKey;
-                for (int i = 2; usedMethodKey.Contains(realMethodKey); ++i) {
-                    realMethodKey = $"{methodKey}_{i}";
-                }
-                methodKey = $"{localizationRoot}.{type.FullName}.{realMethodKey}";
-                #endregion
-                methodKey = GetMethodKey(type, method, methodCount[method.Name] > 1, localizationRoot, usedMethodKey.Contains);
-                LocalizeMethod(method, methodKey, registerKey, useLocalizedText);
+                var methodKey = GetMethodKey(type, method, methodCount[method.Name] > 1, localizationRoot, usedMethodKey.Contains);
+                LocalizeMethod(method, methodKey, registerKey, useLocalizedText, cursorFilter);
             }
         }
     }
@@ -108,19 +127,23 @@ public static class TigerForceLocalizationHelper {
         methodKey = $"{root}.{type.FullName}.{realMethodKey}";
         return methodKey;
     }
-    
+
     /// <summary>
-    /// 本地化特定方法, 具体规则见 <see cref="LocalizeAll(string, string, bool, string?, bool)"/>
+    /// 本地化特定方法, 具体规则见 <see cref="LocalizeAll"/>
     /// </summary>
     /// <param name="method">本地化的目标方法</param>
     /// <param name="methodKey">
     /// <br/>此方法的键名
     /// <br/>实际的键名会是 &lt;<paramref name="methodKey"/>>.&lt;序号>.OldString/NewString
     /// </param>
-    /// <inheritdoc cref="LocalizeAll(string, string, bool, string?, bool)"/>
+    /// <param name="cursorFilter">
+    /// 筛选特定字符串处的<see cref="ILCursor"/>
+    /// 此时 <see cref="ILCursor.Next"/> 一般会指向一处 ldstr
+    /// </param>
+    /// <inheritdoc cref="LocalizeAll"/>
     /// <param name="registerKey"></param>
     /// <param name="useLocalizedText"></param>
-    public static void LocalizeMethod(MethodInfo method, string methodKey, bool registerKey = false, bool useLocalizedText = true) {
+    public static void LocalizeMethod(MethodInfo method, string methodKey, bool registerKey = false, bool useLocalizedText = true, ILCursorFilter? cursorFilter = null) {
         #region 跳过不需要本地化的方法
         if (!registerKey) {
             if (!Language.Exists(methodKey + ".1.OldString")) {
@@ -175,10 +198,12 @@ public static class TigerForceLocalizationHelper {
                 if (oldString == null || cursor.Next == null) {
                     continue;
                 }
-                if (!localizations.TryGetValue(oldString, out var newStringClass)) {
-                    if (!registerKey) {
-                        continue;
-                    }
+                var inLocalizations = localizations.TryGetValue(oldString, out var newStringClass);
+                if (!inLocalizations && !registerKey)
+                    continue;
+                if (cursorFilter != null && !cursorFilter.Filter(cursor))
+                    continue;
+                if (!inLocalizations) {
                     string stringPairKey = $"{methodKey}.{localizations.Count + 1}.";
                     string oldStringKey = stringPairKey + "OldString";
                     string newStringKey = stringPairKey + "NewString";
@@ -187,14 +212,14 @@ public static class TigerForceLocalizationHelper {
                     newStringClass = new SingleNewString(newStringKey, useLocalizedText);
                     localizations.Add(oldString, newStringClass);
                 }
-                string newString = newStringClass.GetValue();
+                string newString = newStringClass!.GetValue();
                 if (!useLocalizedText) {
                     cursor.Next.Operand = newString;
                 }
                 else {
                     cursor.MoveAfterLabels();
                     cursor.EmitLdstr(newString);
-                    cursor.EmitCall(LanguageGetTextValueMethod);
+                    cursor.EmitCall(TMLReflections.Language.GetTextValue_string);
                     cursor.Remove();
                 }
             }
@@ -206,7 +231,7 @@ public static class TigerForceLocalizationHelper {
     /// <br/>建议以 "Mods.&lt;selfModName>" 开头
     /// <br/>实际的键名会是 &lt;<paramref name="localizationRoot"/>>.&lt;type.FullName>.&lt;method name>.&lt;序号>.OldString/NewString
     /// </param>
-    /// <inheritdoc cref="LocalizeMethod(MethodInfo, string, bool, bool)"/>
+    /// <inheritdoc cref="LocalizeMethod(MethodInfo, string, bool, bool, ILCursorFilter)"/>
     /// <param name="method"></param>
     /// <param name="registerKey"></param>
     /// <param name="useLocalizedText"></param>
@@ -217,17 +242,6 @@ public static class TigerForceLocalizationHelper {
             .Where(m => m.Name == method.Name).Count() > 1;
         var methodKey = GetMethodKey(method.DeclaringType!, method, duplicated, localizationRoot);
         LocalizeMethod(method, methodKey, registerKey, useLocalizedText);
-    }
-
-    private static MethodInfo? languageGetTextValueMethod;
-    private static MethodInfo LanguageGetTextValueMethod {
-        get {
-            if (languageGetTextValueMethod != null) {
-                return languageGetTextValueMethod;
-            }
-            languageGetTextValueMethod = typeof(Language).GetMethod(nameof(Language.GetTextValue), BindingFlags.Static | BindingFlags.Public, [typeof(string)])!;
-            return languageGetTextValueMethod;
-        }
     }
 
     #region class NewString
