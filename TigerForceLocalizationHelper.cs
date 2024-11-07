@@ -1,4 +1,5 @@
 using MonoMod.Cil;
+using MonoMod.RuntimeDetour;
 using MonoMod.Utils;
 using System;
 using System.Collections.Generic;
@@ -18,6 +19,7 @@ namespace TigerForceLocalizationLib;
 /// 用以辅助本地化的一些方法
 /// </summary>
 public static class TigerForceLocalizationHelper {
+    #region LocalizeAll, LocalizeMethod
     /// <summary>
     /// 筛选需要本地化的内容
     /// </summary>
@@ -129,7 +131,7 @@ public static class TigerForceLocalizationHelper {
     }
 
     /// <summary>
-    /// 本地化特定方法, 具体规则见 <see cref="LocalizeAll"/>
+    /// 本地化特定方法, 具体规则见 <see cref="LocalizeAll(string, string, bool, string?, bool, LocalizeFilters?)"/>
     /// </summary>
     /// <param name="method">本地化的目标方法</param>
     /// <param name="methodKey">
@@ -140,7 +142,7 @@ public static class TigerForceLocalizationHelper {
     /// 筛选特定字符串处的<see cref="ILCursor"/>
     /// 此时 <see cref="ILCursor.Next"/> 一般会指向一处 ldstr
     /// </param>
-    /// <inheritdoc cref="LocalizeAll"/>
+    /// <inheritdoc cref="LocalizeAll(string, string, bool, string?, bool, LocalizeFilters?)"/>
     /// <param name="registerKey"></param>
     /// <param name="useLocalizedText"></param>
     public static void LocalizeMethod(MethodInfo method, string methodKey, bool registerKey = false, bool useLocalizedText = true, ILCursorFilter? cursorFilter = null) {
@@ -264,6 +266,103 @@ public static class TigerForceLocalizationHelper {
 
         private int count;
         public override string GetValue() => count < Values.Count ? Values[count++] : DefaultValue;
+    }
+    #endregion
+    #endregion
+    #region ShowLocalizationRegisterProgress
+    /// <summary>
+    /// <br/>在加载模组的最后阶段显示添加键的进度
+    /// <br/>当 <see cref="LocalizeAll(string, string, bool, string?, bool, LocalizeFilters?)"/> 的 registerKey 为 <see langword="true"/> 时,
+    /// <br/>第一次注册键往往是一个漫长的过程
+    /// <br/>此方法可以在此过程中显示其进度
+    /// </summary>
+    public static void ShowLocalizationRegisterProgress(string progressTextFormat = "更新本地化文件: {0}", string subProgressTextFormat = "注册键: {0}") {
+        if (finishedLocalizeRegister)
+            return;
+        if (showLocalizationRegisterProgressHooks == null) {
+            showLocalizationRegisterProgressHooks = new(progressTextFormat, subProgressTextFormat);
+        }
+        else {
+            showLocalizationRegisterProgressHooks.ProgressTextFormat = progressTextFormat;
+            showLocalizationRegisterProgressHooks.SubProgressTextFormat = subProgressTextFormat;
+        }
+    }
+
+    private static bool finishedLocalizeRegister;
+    private static ShowLocalizationRegisterProgressHooksClass? showLocalizationRegisterProgressHooks;
+
+    private class ShowLocalizationRegisterProgressHooksClass : IDisposable {
+        private readonly Hook updateLocalizationFilesForModHook;
+        private readonly ILHook updateLocalizationFilesForModILHook;
+        private readonly Hook addEntryToHJSONHook;
+        private readonly Hook updateLocalizationFilesHook;
+
+        public string ProgressTextFormat { get; set; }
+        public string SubProgressTextFormat { get; set; }
+
+        public ShowLocalizationRegisterProgressHooksClass(string progressTextFormat, string subProgressTextFormat) {
+            ProgressTextFormat = progressTextFormat;
+            SubProgressTextFormat = subProgressTextFormat;
+            updateLocalizationFilesForModHook = new(TMLReflections.LocalizationLoader.UpdateLocalizationFilesForModMethod, On_LocalizationLoader_UpdateLocalizationFilesForMod);
+            updateLocalizationFilesForModILHook = new(TMLReflections.LocalizationLoader.UpdateLocalizationFilesForModMethod, IL_LocalizationLoader_UpdateLocalizationFilesForMod);
+            addEntryToHJSONHook = new(TMLReflections.LocalizationLoader.AddEntryToHJSONMethod, On_LocalizationLoader_AddEntryToHJSON);
+            updateLocalizationFilesHook = new(TMLReflections.LocalizationLoader.UpdateLocalizationFilesMethod, On_LocalizationLoader_UpdateLocalizationFiles);
+        }
+
+        private Mod? localizingMod;
+        private int totalLocalizations;
+        private int currentLocalzationCount;
+
+        private delegate void UpdateLocalizationFilesForModDelegate(Mod mod, string? outputPath, GameCulture? specificCulture);
+        private void On_LocalizationLoader_UpdateLocalizationFilesForMod(UpdateLocalizationFilesForModDelegate orig, Mod mod, string? outputPath, GameCulture? specificCulture) {
+            localizingMod = mod;
+            TMLReflections.UILoadMods.SetProgressText(string.Format(ProgressTextFormat, mod.DisplayNameClean));
+            orig(mod, outputPath, specificCulture);
+            localizingMod = null;
+            TMLReflections.UILoadMods.SetSubProgressText("");
+            TMLReflections.UILoadMods.SetProgress(0);
+        }
+        private void IL_LocalizationLoader_UpdateLocalizationFilesForMod(ILContext il) {
+            ILCursor cursor = new(il);
+            cursor.GotoNext(MoveType.After, i => i.MatchStloc(9)); // baseLocalizationKeys
+            cursor.EmitLdloc(9);
+            cursor.EmitDelegate((HashSet<string> baseLocalizationKeys) => {
+                if (localizingMod == null)
+                    return;
+                totalLocalizations = TMLReflections.LanguageManager.LocalizedText.Values.Count(t => t.Key.StartsWith($"Mods.{localizingMod.Name}.") && !baseLocalizationKeys.Contains(t.Key));
+                if (totalLocalizations <= 0)
+                    totalLocalizations = 1;
+                currentLocalzationCount = 0;
+            });
+        }
+
+        private delegate void AddEntryToHJSONDelegate(LocalizationLoader.LocalizationFile file, string key, string value, string comment);
+        private void On_LocalizationLoader_AddEntryToHJSON(AddEntryToHJSONDelegate orig, LocalizationLoader.LocalizationFile file, string key, string value, string comment) {
+            if (localizingMod != null) {
+                TMLReflections.UILoadMods.SetProgress((float)currentLocalzationCount++ / totalLocalizations);
+                TMLReflections.UILoadMods.SetSubProgressText(string.Format(SubProgressTextFormat, key));
+            }
+            orig(file, key, value, comment);
+        }
+
+        private void On_LocalizationLoader_UpdateLocalizationFiles(Action orig) {
+            orig();
+            finishedLocalizeRegister = true;
+            Dispose();
+            showLocalizationRegisterProgressHooks = null;
+        }
+
+        public void Dispose() {
+            updateLocalizationFilesForModHook.Undo();
+            updateLocalizationFilesForModHook.Dispose();
+            updateLocalizationFilesForModILHook.Undo();
+            updateLocalizationFilesForModILHook.Dispose();
+            addEntryToHJSONHook.Undo();
+            addEntryToHJSONHook.Dispose();
+            updateLocalizationFilesHook.Undo();
+            updateLocalizationFilesHook.Dispose();
+            localizingMod = null;
+        }
     }
     #endregion
 }

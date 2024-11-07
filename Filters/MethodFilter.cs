@@ -95,6 +95,54 @@ public class MethodFilter(Func<MethodInfo, bool> filter) : FilterBase<MethodInfo
     /// <param name="type">所匹配的类型</param>
     public static MethodFilter MatchDeclaringType(Type type) => MatchDeclaringType(true, type);
     #endregion
-    // TODO:筛选特定类的 get_Texture, get_HighlightTexture, GetLocalization, GetLocalizationKey, GetLocalizedValue
+
+    /// <summary>
+    /// 能够筛除一些基本不可能需要本地化的方法
+    /// </summary>
+    public static MethodFilter CommonMethodFilter => new(method => {
+        var declaringType = method.DeclaringType;
+        var name = method.Name;
+        if (declaringType == null)
+            return true;
+        if (declaringType.IsAssignableTo(typeof(Terraria.ModLoader.ModType))) {
+            if (name is "get_Texture" or "get_HighlightTexture" or "get_Name"
+                or "SaveData" or "LoadData"
+                or "IsLoadingEnabled" or "ValidateType" or "Load"
+                or "AutoStaticDefaults" or "AutoDefaults"
+                or "SetStaticDefaults" or "SetDefaults"
+                or "AddRecipes"
+                or "Unload") {
+                return false;
+            }
+        }
+        if (declaringType.IsAssignableTo(typeof(Terraria.ModLoader.ILocalizedModType))) {
+            if (name == "get_LocalizationCategory")
+                return false;
+            if (method.ReturnType == typeof(Terraria.Localization.LocalizedText)) {
+                if (name is "get_DisplayName" or "get_Tooltip") {
+                    return false;
+                }
+            }
+        }
+
+        bool isModSystem = declaringType.IsAssignableTo(typeof(Terraria.ModLoader.ModSystem));
+        if (isModSystem) {
+            if (name is "SaveWorldData" or "LoadWorldData" or "SaveWorldHeader") {
+                return false;
+            }
+        }
+
+        // 加载卸载相关的方法
+        if (declaringType.IsAssignableTo(typeof(Terraria.ModLoader.Mod)) || isModSystem) {
+            if (name is "Load" or "OnModLoad" or "SetupContent" or "PostSetupContent"
+                or "AddRecipeGroups" or "AddRecipes" or "PostAddRecipes"
+                or "OnLocalizationsLoaded"
+                or "Close" or "OnModUnload" or "Unload") {
+                return false;
+            }
+        }
+
+        return true;
+    });
     #endregion
 }

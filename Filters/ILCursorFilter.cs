@@ -273,6 +273,7 @@ public class ILCursorFilter(Func<ILCursor, bool> filter) : FilterBase<ILCursor>(
         typeof(Terraria.ModLoader.BackgroundTextureLoader).FullName,
         typeof(Terraria.ModLoader.DamageClass).FullName, // ShowStatTooltipLine
         typeof(Terraria.ModLoader.EquipLoader).FullName,
+        typeof(Terraria.ModLoader.ILocalizedModTypeExtensions).FullName,
         typeof(Terraria.ModLoader.KeybindLoader).FullName,
         typeof(Terraria.ModLoader.ModLoader).FullName,
         typeof(Terraria.ModLoader.MusicLoader).FullName,
@@ -421,7 +422,7 @@ public class ILCursorFilter(Func<ILCursor, bool> filter) : FilterBase<ILCursor>(
         int stack = 1;
         for (ins = ins.Next; ins != null; ins = ins.Next) {
             // TODO?: 跳转处理
-            if (ins.OpCode.FlowControl != FlowControl.Next)
+            if (ins.OpCode.FlowControl != FlowControl.Next && ins.OpCode.FlowControl != FlowControl.Call)
                 return null;
             if (ins.MatchCallOrCallvirt(out var methodReference) || ins.MatchNewobj(out methodReference)) {
                 stack -= !methodReference.HasParameters ? 0 : methodReference.Parameters.Count;
