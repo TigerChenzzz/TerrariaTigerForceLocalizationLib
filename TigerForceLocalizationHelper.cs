@@ -80,8 +80,14 @@ public static class TigerForceLocalizationHelper {
         localizationRoot ??= $"Mods.{selfModName}.ForceLocalizations";
         #region 处理 filters
         var typeFilter = filters?.TypeFilter;
-        var types = typeFilter == null ? AssemblyManager.GetLoadableTypes(mod.Code).Where(t => !t.ContainsGenericParameters)
-            : AssemblyManager.GetLoadableTypes(mod.Code).Where(t => !t.ContainsGenericParameters && typeFilter.Filter(t));
+        bool ShouldJITRecursive(Type type) => jitFilter.ShouldJIT(type) && (type.DeclaringType is null || ShouldJITRecursive(type.DeclaringType));
+
+        var types = AssemblyManager.GetModAssemblies(modName)
+            .SelectMany(AssemblyManager.GetLoadableTypes)
+            .Where(ShouldJITRecursive)
+            .Where(t => !t.ContainsGenericParameters);
+        if (typeFilter != null)
+            types = types.Where(typeFilter.Filter);
         var methodFilter = filters?.MethodFilter;
         Func<MethodInfo, bool> GetMethodPredicate(Type type) => methodFilter == null
             ? method => method.DeclaringType == type
