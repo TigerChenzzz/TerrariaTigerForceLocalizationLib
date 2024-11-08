@@ -76,6 +76,7 @@ public static class TigerForceLocalizationHelper {
         if (!ModLoader.TryGetMod(modName, out var mod)) {
             throw new Exception($"未找到模组\"{modName}\"!");
         }
+        var jitFilter = mod.PreJITFilter;
         localizationRoot ??= $"Mods.{selfModName}.ForceLocalizations";
         #region 处理 filters
         var typeFilter = filters?.TypeFilter;
@@ -86,10 +87,12 @@ public static class TigerForceLocalizationHelper {
             ? method => method.DeclaringType == type
                     && !method.IsAbstract
                     && !method.ContainsGenericParameters
+                    && jitFilter.ShouldJIT(method)
                     && method.GetMethodBody() != null
             : method => method.DeclaringType == type
                     && !method.IsAbstract
                     && !method.ContainsGenericParameters
+                    && jitFilter.ShouldJIT(method)
                     && method.GetMethodBody() != null
                     && methodFilter.Filter(method);
         var cursorFilter = filters?.CursorFilter;
