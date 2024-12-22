@@ -1,2 +1,4 @@
 这是用来辅助本地化硬编码文本的模组.
 不止于汉化, 用来翻译为其他语言或者多语言都是可以的.
+github 见 https://github.com/TigerChenzzz/TerrariaTigerForceLocalizationLib
+示例模组见 https://steamcommunity.com/sharedfiles/filedetails/?id=3358134129
