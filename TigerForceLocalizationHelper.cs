@@ -20,6 +20,7 @@ namespace TigerForceLocalizationLib;
 /// </summary>
 public static class TigerForceLocalizationHelper {
     #region LocalizeAll, LocalizeMethod
+    #region Filters
     /// <summary>
     /// 筛选需要本地化的内容
     /// </summary>
@@ -38,6 +39,51 @@ public static class TigerForceLocalizationHelper {
         /// </summary>
         public ILCursorFilter? CursorFilter { get; init; }
     }
+    #endregion
+    #region ForceAllWeakReferences
+    private static bool _forceAllWeakReferences = true;
+    /// <summary>
+    /// <br/>是否在注册键时强制需求汉化模组的弱引用要全部开启
+    /// <br/>因为在 <see cref="LocalizationLoader"/> 中对于未开启所有弱引用的模组不会更新其 hjson
+    /// <br/>如果将它设置为否那么会自动炸掉上面所说的逻辑
+    /// </summary>
+    public static bool ForceAllWeakReferences {
+        get => hookForNotAllWeakReferences == null;
+        set {
+            if (value) {
+                if (hookForNotAllWeakReferences == null) {
+                    return;
+                }
+                hookForNotAllWeakReferences.Undo();
+                hookForNotAllWeakReferences.Dispose();
+                hookForNotAllWeakReferences = null;
+                return;
+            }
+            if (hookForNotAllWeakReferences != null) {
+                return;
+            }
+            hookForNotAllWeakReferences = new(TMLReflections.LocalizationLoader.UpdateLocalizationFilesForModMethod, IL_NotAllWeakReferences);
+        }
+    }
+
+    private static ILHook? hookForNotAllWeakReferences;
+    private static void IL_NotAllWeakReferences(ILContext il) {
+        ILCursor cursor = new(il);
+        if (!cursor.TryGotoNext(i => i.MatchLdloc(13), // otherMod
+            i => i.MatchBrtrue(out _),
+            i => i.MatchLeave(out _))) { // if (otherMod == null) return;
+            return;
+        }
+        cursor.Next = cursor.Next!.Next!.Next;
+        ILCursor cursor2 = new(cursor);
+        cursor2.GotoNext(i => i.MatchLdloca(12),
+            i => i.MatchCall(typeof(List<string>.Enumerator), "MoveNext"),
+            i => i.MatchBrtrue(out _));
+        cursor.MoveAfterLabels();
+        cursor.EmitBr(cursor2.Next!);
+    }
+    #endregion
+
     /// <summary>
     /// <br/>以 hjson 的方式本地化一个模组中的所有方法
     /// <br/>在 PostSetup 阶段使用
@@ -75,6 +121,21 @@ public static class TigerForceLocalizationHelper {
     public static void LocalizeAll(string selfModName, string modName, bool registerKey = false, string? localizationRoot = null, bool useLocalizedText = true, LocalizeFilters? filters = null) {
         if (!ModLoader.TryGetMod(modName, out var mod)) {
             throw new Exception($"未找到模组\"{modName}\"!");
+        }
+        if (registerKey && ForceAllWeakReferences && mod.TranslationForMods != null) {
+            List<string> missingWeakReferences = [];
+            foreach (var translateMod in mod.TranslationForMods) {
+                if (!ModLoader.HasMod(translateMod)) {
+                    missingWeakReferences.Add(translateMod);
+                }
+            }
+            if (missingWeakReferences.Count != 0) {
+                throw new Exception($"""
+                    以下弱引用没有开启, 无法进行汉化:
+                    {string.Join('\n', missingWeakReferences)}
+                    你需要开启这些模组或者设置{nameof(TigerForceLocalizationHelper)}.{nameof(ForceAllWeakReferences)} 为 {false}
+                    """);
+            }
         }
         var jitFilter = mod.PreJITFilter;
         localizationRoot ??= $"Mods.{selfModName}.ForceLocalizations";

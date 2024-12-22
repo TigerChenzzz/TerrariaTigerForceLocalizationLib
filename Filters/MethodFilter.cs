@@ -142,6 +142,9 @@ public class MethodFilter(Func<MethodInfo, bool> filter) : FilterBase<MethodInfo
             }
         }
 
+        // TODO: NPC Shop 相关? AddShops...
+        // 匿名方法<AddRecipeGroups>xxx, <ModifyInterfaceLayers>xxx, <AddShops>xxx ...
+
         return true;
     });
     #endregion
