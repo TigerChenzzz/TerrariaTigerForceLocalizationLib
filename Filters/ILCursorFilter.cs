@@ -366,7 +366,7 @@ public class ILCursorFilter(Func<ILCursor, bool> filter) : FilterBase<ILCursor>(
             return false;
         // 待筛类型: Main, Mod, NPC, Player, WorkshopIssueReporter, Utils
         // 泛型: EffectManager, ModTypeLookup
-        // 筛选参数: TooltipLine 构造
+        // 筛选参数: TooltipLine 构造, Condition 构造?
         return true;
     });
 

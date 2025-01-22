@@ -114,6 +114,11 @@ public class MethodFilter(Func<MethodInfo, bool> filter) : FilterBase<MethodInfo
                 or "Unload") {
                 return false;
             }
+            if (declaringType.IsAssignableTo(typeof(Terraria.ModLoader.ModNPC))) {
+                if (name is "OnChatButtonClicked" or "AddShops") {
+                    return false;
+                }
+            }
         }
         if (declaringType.IsAssignableTo(typeof(Terraria.ModLoader.ILocalizedModType))) {
             if (name == "get_LocalizationCategory")
