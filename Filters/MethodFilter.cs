@@ -9,7 +9,7 @@ namespace TigerForceLocalizationLib.Filters;
 /// 用以筛选方法
 /// </summary>
 /// <inheritdoc/>
-public class MethodFilter(Func<MethodInfo, bool> filter) : FilterBase<MethodInfo>(filter) {
+public class MethodFilter(Func<MethodBase, bool> filter) : FilterBase<MethodBase>(filter) {
     #region 运算符重载
     /// <summary>
     /// 两个筛选规则满足其一即可
@@ -123,7 +123,7 @@ public class MethodFilter(Func<MethodInfo, bool> filter) : FilterBase<MethodInfo
         if (declaringType.IsAssignableTo(typeof(Terraria.ModLoader.ILocalizedModType))) {
             if (name == "get_LocalizationCategory")
                 return false;
-            if (method.ReturnType == typeof(Terraria.Localization.LocalizedText)) {
+            if (method is MethodInfo methodInfo && methodInfo.ReturnType == typeof(Terraria.Localization.LocalizedText)) {
                 if (name is "get_DisplayName" or "get_Tooltip") {
                     return false;
                 }

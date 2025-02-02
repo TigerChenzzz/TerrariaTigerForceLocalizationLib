@@ -41,7 +41,6 @@ public static class TigerForceLocalizationHelper {
     }
     #endregion
     #region ForceAllWeakReferences
-    private static bool _forceAllWeakReferences = true;
     /// <summary>
     /// <br/>是否在注册键时强制需求汉化模组的弱引用要全部开启
     /// <br/>因为在 <see cref="LocalizationLoader"/> 中对于未开启所有弱引用的模组不会更新其 hjson
@@ -150,7 +149,7 @@ public static class TigerForceLocalizationHelper {
         if (typeFilter != null)
             types = types.Where(typeFilter.Filter);
         var methodFilter = filters?.MethodFilter;
-        Func<MethodInfo, bool> GetMethodPredicate(Type type) => methodFilter == null
+        Func<MethodBase, bool> GetMethodPredicate(Type type) => methodFilter == null
             ? method => method.DeclaringType == type
                     && !method.IsAbstract
                     && !method.ContainsGenericParameters
@@ -167,7 +166,8 @@ public static class TigerForceLocalizationHelper {
         foreach (var type in types) {
             Dictionary<string, int> methodCount = [];
             HashSet<string> usedMethodKey = [];
-            var methods = type.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+            var methods = type.GetMethods(BFALL)
+                .Concat<MethodBase>(type.GetConstructors(BFALL))
                 .Where(GetMethodPredicate(type)).ToArray();
             foreach (var method in methods) {
                 if (!methodCount.TryAdd(method.Name, 1)) {
@@ -176,20 +176,22 @@ public static class TigerForceLocalizationHelper {
             }
             foreach (var method in methods) {
                 var methodKey = GetMethodKey(type, method, methodCount[method.Name] > 1, localizationRoot, usedMethodKey.Contains);
+                usedMethodKey.Add(methodKey);
                 LocalizeMethod(method, methodKey, registerKey, useLocalizedText, cursorFilter);
             }
         }
     }
 
-    private static string GetMethodKey(Type type, MethodInfo method, bool duplicated, string root, Func<string, bool>? checkMethodKeyUsed = null) {
-        checkMethodKeyUsed ??= methodKey => Language.Exists($"{root}.{type.FullName}.{methodKey}");
+    private static string GetMethodKey(Type type, MethodBase method, bool duplicated, string root, Func<string, bool>? checkMethodKeyUsed = null) {
+        checkMethodKeyUsed ??= methodKey => Language.Exists($"{root}.{type.FullName}.{methodKey}.1.OldString");
         string methodKey;
+        var methodName = method.Name.Replace('.', '*'); // .ctor, .cctor, 以及它们里面的闭包方法
         if (!duplicated) {
-            methodKey = method.Name;
+            methodKey = methodName;
         }
         else {
             StringBuilder methodKeyBuilder = new();
-            methodKeyBuilder.Append(method.Name).Append('_').AppendJoin('_', method.GetParameters().Select(p => p.ParameterType.Name));
+            methodKeyBuilder.Append(methodName).Append('_').AppendJoin('_', method.GetParameters().Select(p => p.ParameterType.Name));
             methodKey = methodKeyBuilder.ToString();
         }
         string realMethodKey = methodKey;
@@ -215,7 +217,7 @@ public static class TigerForceLocalizationHelper {
     /// <inheritdoc cref="LocalizeAll(string, string, bool, string?, bool, LocalizeFilters?)"/>
     /// <param name="registerKey"></param>
     /// <param name="useLocalizedText"></param>
-    public static void LocalizeMethod(MethodInfo method, string methodKey, bool registerKey = false, bool useLocalizedText = true, ILCursorFilter? cursorFilter = null) {
+    public static void LocalizeMethod(MethodBase method, string methodKey, bool registerKey = false, bool useLocalizedText = true, ILCursorFilter? cursorFilter = null) {
         #region 跳过不需要本地化的方法
         if (!registerKey) {
             if (!Language.Exists(methodKey + ".1.OldString")) {
@@ -303,14 +305,14 @@ public static class TigerForceLocalizationHelper {
     /// <br/>建议以 "Mods.&lt;selfModName>" 开头
     /// <br/>实际的键名会是 &lt;<paramref name="localizationRoot"/>>.&lt;type.FullName>.&lt;method name>.&lt;序号>.OldString/NewString
     /// </param>
-    /// <inheritdoc cref="LocalizeMethod(MethodInfo, string, bool, bool, ILCursorFilter)"/>
+    /// <inheritdoc cref="LocalizeMethod(MethodBase, string, bool, bool, ILCursorFilter)"/>
     /// <param name="method"></param>
     /// <param name="registerKey"></param>
     /// <param name="useLocalizedText"></param>
     /// <exception cref="NullReferenceException"></exception>
-    public static void LocalizeMethodByRoot(MethodInfo method, string localizationRoot, bool registerKey = false, bool useLocalizedText = true) {
+    public static void LocalizeMethodByRoot(MethodBase method, string localizationRoot, bool registerKey = false, bool useLocalizedText = true) {
         var type = method.DeclaringType ?? throw new NullReferenceException("method should have declaring type");
-        bool duplicated = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
+        bool duplicated = type.GetMethods(BFALL)
             .Where(m => m.Name == method.Name).Count() > 1;
         var methodKey = GetMethodKey(method.DeclaringType!, method, duplicated, localizationRoot);
         LocalizeMethod(method, methodKey, registerKey, useLocalizedText);
@@ -436,5 +438,8 @@ public static class TigerForceLocalizationHelper {
             localizingMod = null;
         }
     }
+    #endregion
+    #region 辅助
+    private const BindingFlags BFALL = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     #endregion
 }

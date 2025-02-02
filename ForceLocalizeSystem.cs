@@ -52,17 +52,17 @@ public abstract class ForceLocalizeSystem<TSelf> where TSelf : ForceLocalizeSyst
     /// <br/>或 <see cref="LocalizeByType"/>
     /// <br/>注意如果此方法有多个重载 (即多个重名的方法), 则上述三个无法使用 (只能用这个)
     /// </summary>
-    /// <param name="methodInfo">此方法, 由反射得到</param>
+    /// <param name="methodBase">此方法, 由反射得到</param>
     /// <param name="localizations">需要替换的字符串, 键为替换前, 值为替换后</param>
-    public static void Localize(MethodInfo? methodInfo, Dictionary<string, string> localizations) {
-        if (methodInfo == null) {
+    public static void Localize(MethodBase? methodBase, Dictionary<string, string> localizations) {
+        if (methodBase == null) {
             LogError("Method Null!\n" + new StackTrace());
             return;
         }
         if (localizations.Count == 0) {
             return;
         }
-        MonoModHooks.Modify(methodInfo, il => {
+        MonoModHooks.Modify(methodBase, il => {
             ILCursor cursor = new(il);
             string? str = null;
             while (cursor.TryGotoNext(i => i.MatchLdstr(out str))) {
@@ -140,16 +140,16 @@ public abstract class ForceLocalizeSystem<TSelf> where TSelf : ForceLocalizeSyst
     /// <br/>即使不需要替换也要写上一项 (替换前和替换后相同的值)
     /// </param>
     /// <inheritdoc cref="Localize"/>
-    /// <param name="methodInfo"></param>
-    public static void LocalizeInOrder(MethodInfo? methodInfo, List<(string Key, string Value)> localizationsInOrder) {
-        if (methodInfo == null) {
+    /// <param name="methodBase"></param>
+    public static void LocalizeInOrder(MethodBase? methodBase, List<(string Key, string Value)> localizationsInOrder) {
+        if (methodBase == null) {
             LogError("Method Null!\n" + new StackTrace());
             return;
         }
         if (localizationsInOrder.Count == 0) {
             return;
         }
-        MonoModHooks.Modify(methodInfo, il => {
+        MonoModHooks.Modify(methodBase, il => {
             ILCursor cursor = new(il);
             string? str = null;
             int i = 0;
@@ -212,27 +212,27 @@ public abstract class ForceLocalizeSystem<TSelf> where TSelf : ForceLocalizeSyst
     /// </summary>
     /// <param name="includeSelf">是否同时替换此方法下的字符串</param>
     /// <inheritdoc cref="Localize"/>
-    /// <param name="methodInfo"></param>
+    /// <param name="methodBase"></param>
     /// <param name="localizations"></param>
-    public static void LocalizeDerived(MethodInfo? methodInfo, Dictionary<string, string> localizations, bool includeSelf = false) {
-        if (methodInfo == null) {
+    public static void LocalizeDerived(MethodBase? methodBase, Dictionary<string, string> localizations, bool includeSelf = false) {
+        if (methodBase == null) {
             LogError("Method Null!\n" + new StackTrace());
             return;
         }
         if (includeSelf) {
-            Localize(methodInfo, localizations);
+            Localize(methodBase, localizations);
         }
-        if (methodInfo.ReflectedType == null) {
+        if (methodBase.ReflectedType == null) {
             LogError("Method Don't have a reflectedType!\n" + new StackTrace());
             return;
         }
-        if (!methodInfo.IsVirtual) {
+        if (!methodBase.IsVirtual) {
             return;
         }
-        string methodName = methodInfo.Name;
-        Type[] types = methodInfo.GetParameters().Select(p => p.ParameterType).ToArray();
+        string methodName = methodBase.Name;
+        Type[] types = methodBase.GetParameters().Select(p => p.ParameterType).ToArray();
         foreach (var type in TypeHelper.TypeByFullName.Values) {
-            if (!type.IsSubclassOf(methodInfo.ReflectedType)) {
+            if (!type.IsSubclassOf(methodBase.ReflectedType)) {
                 continue;
             }
             var method = type.GetMethod(methodName, BFALL, types);
