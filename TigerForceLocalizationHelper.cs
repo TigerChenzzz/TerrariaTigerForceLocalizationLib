@@ -239,7 +239,7 @@ public static class TigerForceLocalizationHelper {
             if (!Language.Exists(oldStringKey)) {
                 break;
             }
-            string oldString = Language.GetTextValue(oldStringKey);
+            string oldString = GetTextValueModified(oldStringKey);
             string newStringKey = stringPairKey + "NewString";
             if (Language.Exists(newStringKey + "_1")) {
                 List<string> newStrings = [];
@@ -248,13 +248,13 @@ public static class TigerForceLocalizationHelper {
                     if (!Language.Exists(newStringsKey)) {
                         break;
                     }
-                    newStrings.Add(useLocalizedText ? newStringsKey : Language.GetTextValue(newStringsKey));
+                    newStrings.Add(useLocalizedText ? newStringsKey : GetTextValueModified(newStringsKey));
                 }
                 if (newStrings.Count == 0) {
                     Debug.Assert(false, "应该存在 NewString_1 但却没有");
                     continue;
                 }
-                string? defaultNewString = !Language.Exists(newStringKey) ? null : useLocalizedText ? newStringKey : Language.GetTextValue(newStringKey);
+                string? defaultNewString = !Language.Exists(newStringKey) ? null : useLocalizedText ? newStringKey : GetTextValueModified(newStringKey);
                 localizations.Add(oldString, new MultipleNewString(newStrings, defaultNewString));
             }
             else {
@@ -281,8 +281,8 @@ public static class TigerForceLocalizationHelper {
                     string stringPairKey = $"{methodKey}.{localizations.Count + 1}.";
                     string oldStringKey = stringPairKey + "OldString";
                     string newStringKey = stringPairKey + "NewString";
-                    Language.GetOrRegister(oldStringKey, () => oldString);
-                    Language.GetOrRegister(newStringKey, () => oldString);
+                    Language.GetOrRegister(oldStringKey, () => ToHjsonValue(oldString));
+                    Language.GetOrRegister(newStringKey, () => ToHjsonValue(oldString));
                     newStringClass = new SingleNewString(newStringKey, useLocalizedText);
                     localizations.Add(oldString, newStringClass);
                 }
@@ -293,7 +293,7 @@ public static class TigerForceLocalizationHelper {
                 else {
                     cursor.MoveAfterLabels();
                     cursor.EmitLdstr(newString);
-                    cursor.EmitCall(TMLReflections.Language.GetTextValue_string);
+                    cursor.EmitCall(GetTextValueModifiedMethodInfo);
                     cursor.Remove();
                 }
             }
@@ -324,7 +324,7 @@ public static class TigerForceLocalizationHelper {
     }
 
     private class SingleNewString(string value) : NewString {
-        public SingleNewString(string key, bool useLocalizedText) : this(useLocalizedText ? key : Language.GetTextValue(key)) { }
+        public SingleNewString(string key, bool useLocalizedText) : this(useLocalizedText ? key : GetTextValueModified(key)) { }
         public override string GetValue() => value;
     }
 
@@ -441,5 +441,30 @@ public static class TigerForceLocalizationHelper {
     #endregion
     #region 辅助
     private const BindingFlags BFALL = BindingFlags.Static | BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+    // 由于 HjsonValue.Parse 会将值中开头的空字符去除, 所以需要一些特殊处理
+    // 具体做法是如果开头是空格, '\t', 或单引号, 就额外在字符串开头加一个单引号
+    private static string ToHjsonValue(string value) {
+        if (value.StartsWith(' ') || value.StartsWith('\t')) {
+            return '\'' + value;
+        }
+        if (value.StartsWith('\'') && value.Length >= 2 && value[1] is ' ' or '\t' or '\'') {
+            return '\'' + value;
+        }
+        return value;
+    }
+    private static string FromHjsonValue(string hjsonValue) {
+        if (!hjsonValue.StartsWith('\'') || hjsonValue.Length <= 1) {
+            return hjsonValue;
+        }
+        if (hjsonValue[1] is ' ' or '\t' or '\'') {
+            return hjsonValue[1..];
+        }
+        return hjsonValue;
+    }
+    private static string GetTextValueModified(string key) => FromHjsonValue(Language.GetTextValue(key));
+
+    private static MethodInfo? _getTextValueModifiedMethodInfo;
+    internal static MethodInfo GetTextValueModifiedMethodInfo => _getTextValueModifiedMethodInfo ??= typeof(TigerForceLocalizationHelper).GetMethod(nameof(GetTextValueModified), BFALL)!;
     #endregion
 }

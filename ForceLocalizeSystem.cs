@@ -494,7 +494,9 @@ public sealed class ForceLocalizeSystemImpl<TMod> : ForceLocalizeSystemByMod<TMo
 
 /// <summary>
 /// <br/>此类需继承后使用
-/// <br/>此类使用 Language.GetTextValue(key) 代替原字符串, 使用 Localize 系方法时传入的新字符串默认应是 hjson 中的键
+/// <br/>此类使用 Language.GetTextValue(key) 代替原字符串,
+/// <br/>并且会特殊处理开头的空白字符
+/// <br/>使用 Localize 系方法时传入的新字符串默认应是 hjson 中的键
 /// </summary>
 /// <inheritdoc cref="ForceLocalizeSystem{TSelf}"/>
 public abstract class ForceLocalizeSystemByLocalizeText<TSelf> : ForceLocalizeSystem<TSelf> where TSelf : ForceLocalizeSystemByLocalizeText<TSelf> {
@@ -503,15 +505,16 @@ public abstract class ForceLocalizeSystemByLocalizeText<TSelf> : ForceLocalizeSy
         Language.GetOrRegister(@new, () => old);
         cursor.MoveAfterLabels();
         cursor.EmitLdstr(@new);
-        cursor.EmitCall(languageGetTextValueMethod);
+        cursor.EmitCall(TigerForceLocalizationHelper.GetTextValueModifiedMethodInfo);
         cursor.Remove();
     }
-    private readonly MethodInfo languageGetTextValueMethod = typeof(Language).GetMethod(nameof(Language.GetTextValue), BindingFlags.Static | BindingFlags.Public, [typeof(string)])!;
 }
 
 /// <summary>
 /// <br/>此类需继承后使用, 这样不用重写 <see cref="ModName"/>
-/// <br/>此类使用 Language.GetTextValue(key) 代替原字符串, 使用 Localize 系方法时传入的新字符串默认应是 hjson 中的键
+/// <br/>此类使用 Language.GetTextValue(key) 代替原字符串,
+/// <br/>并且会特殊处理开头的空白字符
+/// <br/>使用 Localize 系方法时传入的新字符串默认应是 hjson 中的键
 /// </summary>
 /// <inheritdoc cref="ForceLocalizeSystemImpl{TMod}"/>
 public abstract class ForceLocalizeSystemByLocalizeText<TMod, TSelf> : ForceLocalizeSystemByLocalizeText<TSelf> where TMod : Mod where TSelf : ForceLocalizeSystemByLocalizeText<TMod, TSelf> {
@@ -522,7 +525,9 @@ public abstract class ForceLocalizeSystemByLocalizeText<TMod, TSelf> : ForceLoca
 
 /// <summary>
 /// <br/>此类可直接使用
-/// <br/>此类使用 Language.GetTextValue(key) 代替原字符串, 使用 Localize 系方法时传入的新字符串应是 hjson 中的键
+/// <br/>此类使用 Language.GetTextValue(key) 代替原字符串,
+/// <br/>并且会特殊处理开头的空白字符
+/// <br/>使用 Localize 系方法时传入的新字符串默认应是 hjson 中的键
 /// </summary>
 /// <inheritdoc cref="ForceLocalizeSystemImpl{TMod}"/>
 public sealed class ForceLocalizeSystemByLocalizeTextImpl<TMod> : ForceLocalizeSystemByLocalizeText<TMod, ForceLocalizeSystemByLocalizeTextImpl<TMod>> where TMod : Mod { }
