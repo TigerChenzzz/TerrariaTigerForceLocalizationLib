@@ -69,6 +69,23 @@ TigerForceLocalizationHelper.LocalizeAll(selfMod, targetMod, true, filters: new(
 ## 局限
 此库目前仅能够替换方法中的直接的字符串使用, 对于初始化, 加载时就已经保存下来的字符串等特殊情况,
 则仍需要额外的代码专门处理 (比如需要修改对应的字段).
+## 杂项
+### 开头空格的转义
+因为 hjson 的某些问题,
+当需要本地化的值的开头为空格或者制表符 ('\t') 或单引号时,
+会在开头额外添加一个单引号,
+此规则无论对于 OldString 或者 NewString 都适用.<p/>
+例如若一个 NewString 需为 `" \" "`,
+对于 hjson 它本应表示为 `NewString: ''' " '''`,
+但现需写为 `NewString: '''' " '''` (此处NewString: 后为4个单引号),
+对于多行字符串`" after whitespace\nthe second line"`则是:
+~~~
+NewString:
+    '''
+    ' after whitespace
+    the second line
+    '''
+~~~
 ## 链接
 示例: [TerrariaTigerForceLocalizationExample](https://github.com/TigerChenzzz/TerrariaTigerForceLocalizationExample)<br/>
 [Steam 创意工坊](https://steamcommunity.com/sharedfiles/filedetails/?id=3358131784)
